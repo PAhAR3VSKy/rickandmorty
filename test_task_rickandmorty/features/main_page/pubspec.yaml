@@ -1,0 +1,23 @@
+#TODO
+
+name: main_page
+description: utils for develop not for prod version
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ">=2.17.6 <3.0.0"
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  test_task_rickandmorty:
+    path: ../../
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+
+flutter:

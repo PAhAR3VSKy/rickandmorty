@@ -1,0 +1,41 @@
+# Конфигурация Fastlane для Android-сборки.
+#
+# ВАЖНО: в релизном цикле Android-сборки Fastlane используется только для CD (выгрузка приложения в
+# Firebase App Distribution).
+#
+# Документация:https://docs.fastlane.tools
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+fastlane_version "2.108.0" #todo your fastlane version
+
+default_platform(:android)
+
+default_platform(:android)
+
+platform :android do
+  desc "Build android aab and apk"
+  lane :build_android do |options|
+    version = google_play_track_version_codes(
+      track: 'internal',
+      json_key_data: ENV['ANDROID_ACCESS_JSON_DATA']
+    )[0] + 1
+    sh "sed -i '' 's/flutterVersionCode.toInteger()/#{version}/' ../app/build.gradle"
+    # Build AAB
+    sh "./flutter_build.sh --clean"
+    # Build APK
+    sh "./flutter_build.sh --apk"
+  end
+
+  desc "Deploy (Upload to play store)"
+  lane :deploy_android do |options|
+    upload_to_play_store(
+      track: options[:production] ? 'production' : options[:internal] ? 'internal' : options[:alpha] ? 'alpha' : 'beta',
+      aab: '../build/app/outputs/bundle/release/app-release.aab',
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_metadata: true,
+      json_key_data: ENV['ANDROID_ACCESS_JSON_DATA']
+    )
+  end
+end

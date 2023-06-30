@@ -1,0 +1,18 @@
+{
+  "@@locale": "ru",
+  "rickAndMorty": "Рик и Морти",
+  "choiceStatus": "Выбрать статус",
+  "status": "Статус",
+  "choiceGender": "Выбрать гендер",
+  "gender": "Гендер",
+  "writeName":"Введите имя персонажа",
+  "occurredError":"Произошла ошибка запроса,\nповторите запрос",
+  "reload":"Перезагрузить",
+  "writeSpecies":"Введите расу",
+  "name":"Имя",
+  "species":"Раса",
+  "type":"Вид",
+  "origin":"Место рождения",
+  "location":"Место нахождения",
+  "created":"Дата рождения"
+}

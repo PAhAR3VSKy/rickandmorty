@@ -1,0 +1,235 @@
+stages:
+  - quality
+  - test
+  - build
+  - pages
+  - deploy
+  - success_notification
+
+variables:
+  LC_ALL: "en_US.UTF-8"
+  LANG: "en_US.UTF-8"
+
+
+lint:
+  stage: quality
+  only:
+    - stage
+    - dev
+    - new_dev
+    - merge_requests
+  #    - cicd
+  tags:
+    - fastlane_mac
+  script:
+    - fvm install
+    - fvm use
+    - melos bs
+    - melos run analyze
+  interruptible: true
+
+code_quality:
+  stage: quality
+  only:
+    - stage
+    - dev
+    - new_dev
+    - merge_requests
+  #    - cicd
+  tags:
+    - fastlane_mac
+  script:
+    - fvm install
+    - fvm use
+    - melos bs
+    - metrics features/**/lib lib -r gitlab > gl-code-quality-report.json
+  artifacts:
+    reports:
+      codequality: gl-code-quality-report.json
+  interruptible: true
+
+test:
+  stage: test
+  only:
+    - stage
+    - dev
+    - new_dev
+    - merge_requests
+  #   - cicd
+  tags:
+    - fastlane_mac
+  script:
+    - fvm install
+    - fvm use
+    - dart pub global activate junitreport
+    - melos clean
+    - fvm flutter clean
+    - melos bs
+    - cd script/test && dart pub get && cd -
+    - rm -rf coverage
+    - melos run test
+    - melos run remove_from_coverage
+    - melos run gen_coverage
+    - dart script/test/remove_from_coverage_all.dart
+    - cd script/test && dart --version && dart convert_reports.dart && cd -
+    - genhtml --no-function-coverage coverage/lcov_all.info -o coverage/html
+  coverage: '/\s*lines\.*:\s*([\d\.]+%)/'
+  artifacts:
+    paths:
+      - coverage/html
+    reports:
+      junit:
+        #        - "report.xml"
+        - "script/test/reports/**_report.xml"
+    expire_in: 1 week
+  interruptible: true
+
+widgetbook:build:
+  stage: build
+  only:
+    - dev
+    - new_dev
+    - widgetbook
+  tags:
+    - fastlane_mac
+  script:
+    - fvm install
+    - fvm use
+    - melos bs
+    - flutter build web -t widgetbook/widgetbook.dart --base-href /$CI_PROJECT_TITLE/widgetbook/
+  artifacts:
+    paths:
+      - build/web
+    expire_in: 1 week
+  interruptible: true
+
+ios:build:
+  stage: build
+  only:
+    - stage
+    - mock
+    - cicd
+  tags:
+    - fastlane_mac
+  script:
+    - export TEMP_KEYCHAIN_NAME=fastlane_$(cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w ${1:-16} | head -n 1)
+    - export TEMP_KEYCHAIN_PASSWORD=$(cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w ${1:-64} | head -n 1)
+    - ./clean_ios.sh
+    - fvm install
+    - fvm use
+    - melos bs
+    - cd script/ios && flutter pub get && cd -
+    - dart script/ios/build.dart --distributor appcenter
+  after_script:
+    - chmod +x "$TELEGRAM_JOB_STATUS_SCRIPT"
+    - "$TELEGRAM_JOB_STATUS_SCRIPT"
+  artifacts:
+    paths:
+      - ios/build/Runner/Runner.ipa
+      - ios/build/Runner/Runner.app.dSYM.zip
+    expire_in: 1 week
+  interruptible: true
+
+android:build:
+  stage: build
+  only:
+    - stage
+    - mock
+    - cicd
+  tags:
+    - fastlane_mac
+  script:
+    - echo flutter.sdk=$FLUTTER_PATH > android/local.properties
+    - echo sdk.dir=$ANDROID_SDK_PATH >> android/local.properties
+    - echo flutter.buildMode=release >> android/local.properties
+    - base64 -d -i "$ANDROID_KEYSTORE" > android/app/release.jks
+    - echo storePassword=$ANDROID_KEY_STORE_PASSWORD > android/key.properties
+    - echo keyPassword=$ANDROID_KEY_PASSWORD >> android/key.properties
+    - echo keyAlias=$ANDROID_KEY_ALIAS >> android/key.properties
+    - echo storeFile=release.jks >> android/key.properties
+    - fvm install
+    - fvm use
+    - melos bs
+    - cd script/android && flutter pub get && cd -
+    - dart script/android/build.dart --distributor appcenter
+    - rm -f android/local.properties
+    - rm -f android/key.properties
+    - rm -f android/app/release.jks
+  after_script:
+    - chmod +x "$TELEGRAM_JOB_STATUS_SCRIPT"
+    - "$TELEGRAM_JOB_STATUS_SCRIPT"
+  artifacts:
+    paths:
+      - android/build/release.apk
+    #      - build/app/outputs/bundle/release/app-release.aab
+    expire_in: 1 week
+  interruptible: true
+
+pages:
+  stage: pages
+  only:
+    - new_dev
+    - stage
+    - widgetbook
+  tags:
+    - fastlane_mac
+  dependencies:
+    - widgetbook:build
+  script:
+    #    - dartdoc --output public/doc
+    #    - metrics features/**/lib lib -r html -o public/metric
+    - mkdir -p public
+    - mv build/web public/widgetbook
+    - echo $PAGES_INDEX_HTML > public/index.html
+  #  after_script:
+  #    - chmod +x "$TELEGRAM_JOB_STATUS_SCRIPT"
+  #    - $TELEGRAM_JOB_STATUS_SCRIPT
+  artifacts:
+    paths:
+      - public
+
+ios:deploy:
+  stage: deploy
+  only:
+    - stage
+    - mock
+    - cicd
+  tags:
+    - fastlane_mac
+  script:
+    - cd script/ios && flutter pub get && cd -
+    - dart script/ios/distribute.dart --distributor appcenter
+  after_script:
+    - chmod +x "$TELEGRAM_JOB_STATUS_SCRIPT"
+    - "$TELEGRAM_JOB_STATUS_SCRIPT"
+  dependencies:
+    - ios:build
+
+android:deploy:
+  stage: deploy
+  only:
+    - stage
+    - mock
+    - cicd
+  tags:
+    - fastlane_mac
+  script:
+    - cd script/android && flutter pub get && cd -
+    - dart script/android/distribute.dart --distributor appcenter
+  after_script:
+    - chmod +x "$TELEGRAM_JOB_STATUS_SCRIPT"
+    - $TELEGRAM_JOB_STATUS_SCRIPT build/app/outputs/apk/release/app-release.apk
+  dependencies:
+    - android:build
+
+success:
+  stage: success_notification
+  only:
+    - stage
+    - mock
+  tags:
+    - fastlane_mac
+  dependencies: [ ]
+  script:
+    - chmod +x "$TELEGRAM_SUCCESS_SCRIPT"
+    - "$TELEGRAM_SUCCESS_SCRIPT"

@@ -1,0 +1,8 @@
+app_identifier("flutter_template") # The bundle identifier of your app
+apple_id("fastlane@dclouds.ru") # Your Apple email address
+
+itc_team_id("flutter_template") # App Store Connect Team ID
+team_id("flutter_template") # Developer Portal Team ID
+
+# For more information about the Appfile, see:
+#     https://docs.fastlane.tools/advanced/#appfile

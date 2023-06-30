@@ -1,0 +1,53 @@
+name: test_task_rickandmorty
+
+sdkPath: .fvm/flutter_sdk
+
+packages:
+  - "*"
+  - "features/**"
+
+scripts:
+
+  analyze:
+    run: melos exec --ignore="*_icons*" -- flutter analyze .
+    description: Run `dart analyze` in all packages.
+
+  test:
+    run: melos run test:selective_unit_test --no-select
+    description: Run Flutter tests for all packages in this project.
+
+  test:selective_unit_test:
+    run: melos exec -- "flutter test --no-pub --coverage --machine > \$MELOS_ROOT_PATH/script/test/reports/\$MELOS_PACKAGE_NAME_report.json || true"
+    description: Run Flutter tests for a specific package in this project.
+    select-package:
+      flutter: true
+      dir-exists: test
+
+  remove_from_coverage:
+    run: melos exec --file-exists="remove_from_coverage" -- "dart \$MELOS_ROOT_PATH/script/test/remove_from_coverage.dart"
+
+  gen_coverage:
+    run: melos exec -c 1 --dir-exists="coverage" -- "dart \$MELOS_ROOT_PATH/script/test/combine_coverage.dart"
+    description: Combine coverage reports.
+
+  build_runner:
+    run: melos exec -- fvm flutter pub run build_runner build --delete-conflicting-outputs
+    description: Use flutter pub run build_runner in selected features.
+    select-package:
+      flutter: true
+
+  localization:
+    run: melos exec --dir-exists="lib/l10n" -- flutter pub global run intl_utils:generate
+    description: Generate localization.
+    select-package:
+      flutter: true
+      dir-exists: lib/l10n
+
+  docs:
+    run: melos exec -- dartdoc
+
+dev_dependencies:
+  flutter_lint_rules:
+    git:
+      url: git@git.dclouds.ru:flutterdev/flutter_lint_rules.git
+      ref: 1.0.0-2

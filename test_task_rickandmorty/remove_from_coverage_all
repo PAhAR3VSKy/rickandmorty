@@ -1,0 +1,3 @@
+regexp:.*mock.*
+regexp:\.g\.dart$
+regexp:.*generated.*
